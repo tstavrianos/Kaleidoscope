@@ -6,7 +6,7 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <PackageReference Include="LLVMSharp" Version="5.0.0" />
+      <PackageReference Include="Llvm.NET" Version="8.0.0-alpha.0.0.ci-BLD.467733899" />
     </ItemGroup>
 
 </Project>

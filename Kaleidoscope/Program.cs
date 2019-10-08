@@ -1,9 +1,10 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using Kaleidoscope.Compiler;
 using Kaleidoscope.Lexer;
 using Kaleidoscope.Parser;
-using LLVMSharp;
+using static Llvm.NET.Interop.Library;
 
 namespace Kaleidoscope
 {
@@ -22,34 +23,38 @@ namespace Kaleidoscope
                 ['-'] = 20,
                 ['*'] = 40
             };
-            
-            var module = LLVM.ModuleCreateWithName("my cool jit");
-            var builder = LLVM.CreateBuilder();
-            _ctx = new Context(module, builder);
-
-            _lexer = new DefaultLexer(File.OpenText(args[0]), binopPrecedence);
-            _parser = new DefaultParser(_lexer);
-            
-            _lexer.GetNextToken();
-            
-            while (true)
+            using (InitializeLLVM())
             {
-                switch (_lexer.CurrentToken)
+                RegisterNative();
+
+
+                _ctx = new Context();
+
+                _lexer = new DefaultLexer(File.OpenText(args[0]), binopPrecedence);
+                _parser = new DefaultParser(_lexer);
+
+                _lexer.GetNextToken();
+
+                while (true)
                 {
-                    case (int)Token.Eof:
-                        return;
-                    case ';':
-                        _lexer.GetNextToken();
-                        break;
-                    case (int)Token.Def:
-                        HandleDefinition();
-                        break;
-                    case (int)Token.Extern:
-                        HandleExtern();
-                        break;
-                    default:
-                        HandleTopLevelExpression();
-                        break;
+                    switch (_lexer.CurrentToken)
+                    {
+                        case (int) Token.Eof:
+                            _ctx.Dispose();
+                            return;
+                        case ';':
+                            _lexer.GetNextToken();
+                            break;
+                        case (int) Token.Def:
+                            HandleDefinition();
+                            break;
+                        case (int) Token.Extern:
+                            HandleExtern();
+                            break;
+                        default:
+                            HandleTopLevelExpression();
+                            break;
+                    }
                 }
             }
         }
@@ -58,8 +63,8 @@ namespace Kaleidoscope
         {
             var data = _parser.ParseDefinition();
             if (data != null) {
-                data.CodeGen(_ctx);
-                LLVM.DumpValue(_ctx.ValueStack.Pop());
+                var value = data.CodeGen(_ctx);
+                Console.WriteLine(value);
             } else {
                 // Skip token for error recovery.
                 _lexer.GetNextToken();
@@ -69,8 +74,8 @@ namespace Kaleidoscope
         static void HandleExtern() {
             var data = _parser.ParseExtern();
             if (data != null) {
-                data.CodeGen(_ctx);
-                LLVM.DumpValue(_ctx.ValueStack.Pop());
+                var value = data.CodeGen(_ctx);
+                Console.WriteLine(value);
             } else {
                 // Skip token for error recovery.
                 _lexer.GetNextToken();
@@ -80,8 +85,8 @@ namespace Kaleidoscope
         static void HandleTopLevelExpression() {
             var data = _parser.ParseTopLevelExpr();
             if (data != null) {
-                data.CodeGen(_ctx);
-                LLVM.DumpValue(_ctx.ValueStack.Pop());
+                var value = data.CodeGen(_ctx);
+                Console.WriteLine(value);
             } else {
                 // Skip token for error recovery.
                 _lexer.GetNextToken();

@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Kaleidoscope.Compiler;
-using LLVMSharp;
+using Llvm.NET.Instructions;
+using Llvm.NET.Values;
 
 namespace Kaleidoscope.Ast
 {
@@ -20,28 +22,22 @@ namespace Kaleidoscope.Ast
 
         public override ExprType NodeType { get; protected set; }
 
-        public override void CodeGen(Context ctx)
+        public override Value CodeGen(Context ctx)
         {
-            var calleeF = LLVM.GetNamedFunction(ctx.Module, this.Callee);
-            if (calleeF.Pointer == IntPtr.Zero)
+            IrFunction function;
+
+            // try for an extern function declaration
+            if( ctx.FunctionDeclarations.TryGetValue( this.Callee, out var target ) )
             {
-                throw new Exception("Unknown function referenced");
+                function = ctx.GetOrDeclareFunction( target );
+            }
+            else
+            {
+                function = ctx.Module.GetFunction( this.Callee ) ?? throw new Exception( $"Definition for function {this.Callee} not found" );
             }
 
-            if (LLVM.CountParams(calleeF) != this.Arguments.Count)
-            {
-                throw new Exception("Incorrect # arguments passed");
-            }
-
-            var argumentCount = (uint)this.Arguments.Count;
-            var argsV = new LLVMValueRef[Math.Max(argumentCount, 1)];
-            for (var i = 0; i < argumentCount; ++i)
-            {
-                this.Arguments[i].CodeGen(ctx);
-                argsV[i] = ctx.ValueStack.Pop();
-            }
-
-            ctx.ValueStack.Push(LLVM.BuildCall(ctx.Builder, calleeF, argsV, "calltmp"));
+            var args = this.Arguments.Select( x => x.CodeGen( ctx ) ).ToArray( );
+            return ctx.InstructionBuilder.Call( function, args ).RegisterName( "calltmp" );
         }
     }
 }

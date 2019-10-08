@@ -1,5 +1,5 @@
 using Kaleidoscope.Compiler;
-using LLVMSharp;
+using Llvm.NET.Values;
 
 namespace Kaleidoscope.Ast
 {
@@ -15,9 +15,9 @@ namespace Kaleidoscope.Ast
 
         public override ExprType NodeType { get; protected set; }
 
-        public override void CodeGen(Context ctx)
+        public override Value CodeGen(Context ctx)
         {
-            ctx.ValueStack.Push(LLVM.ConstReal(LLVM.DoubleType(), this.Value));
+            return ctx.Ctx.CreateConstant( this.Value );
         }
     }
 }

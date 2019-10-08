@@ -1,6 +1,7 @@
 using System;
 using Kaleidoscope.Compiler;
-using LLVMSharp;
+using Llvm.NET.Instructions;
+using Llvm.NET.Values;
 
 namespace Kaleidoscope.Ast
 {
@@ -36,35 +37,24 @@ namespace Kaleidoscope.Ast
 
         public override ExprType NodeType { get; protected set; }
         
-        public override void CodeGen(Context ctx)
+        public override Value CodeGen(Context ctx)
         {
-            this.Lhs.CodeGen(ctx);
-            this.Rhs.CodeGen(ctx);
-            var l = ctx.ValueStack.Pop();
-            var r = ctx.ValueStack.Pop();
-            
-            LLVMValueRef n;
-
             switch (this.NodeType)
             {
                 case ExprType.AddExpr:
-                    n = LLVM.BuildFAdd(ctx.Builder, l, r, "addtmp");
-                    break;
+                    return ctx.InstructionBuilder.FAdd( this.Lhs.CodeGen(ctx), this.Rhs.CodeGen(ctx)).RegisterName( "addtmp" );
                 case ExprType.SubtractExpr:
-                    n = LLVM.BuildFSub(ctx.Builder, l, r, "subtmp");
-                    break;
+                    return ctx.InstructionBuilder.FSub( this.Lhs.CodeGen(ctx), this.Rhs.CodeGen(ctx)).RegisterName( "addtmp" );
                 case ExprType.MultiplyExpr:
-                    n = LLVM.BuildFMul(ctx.Builder, l, r, "multmp");
-                    break;
+                    return ctx.InstructionBuilder.FMul( this.Lhs.CodeGen(ctx), this.Rhs.CodeGen(ctx)).RegisterName( "addtmp" );
                 case ExprType.LessThanExpr:
-                    // Convert bool 0/1 to double 0.0 or 1.0
-                    n = LLVM.BuildUIToFP(ctx.Builder, LLVM.BuildFCmp(ctx.Builder, LLVMRealPredicate.LLVMRealULT, l, r, "cmptmp"), LLVM.DoubleType(), "booltmp");
-                    break;
+                {
+                    var tmp = ctx.InstructionBuilder.Compare( RealPredicate.UnorderedOrLessThan, this.Lhs.CodeGen(ctx), this.Rhs.CodeGen(ctx)).RegisterName( "cmptmp" );
+                    return ctx.InstructionBuilder.UIToFPCast( tmp, ctx.InstructionBuilder.Context.DoubleType ).RegisterName( "booltmp" );
+                }
                 default:
                     throw new Exception("invalid binary operator");
             }
-
-            ctx.ValueStack.Push(n);
         }
     }
 }

@@ -1,4 +1,5 @@
 using Kaleidoscope.Compiler;
+using Llvm.NET.Values;
 
 namespace Kaleidoscope.Ast
 {
@@ -6,6 +7,6 @@ namespace Kaleidoscope.Ast
     {
         public abstract ExprType NodeType { get; protected set; }
 
-        public abstract void CodeGen(Context ctx);
+        public abstract Value CodeGen(Context ctx);
     }
 }

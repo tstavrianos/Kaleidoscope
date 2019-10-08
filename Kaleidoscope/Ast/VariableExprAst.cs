@@ -1,5 +1,6 @@
 using System;
 using Kaleidoscope.Compiler;
+using Llvm.NET.Values;
 
 namespace Kaleidoscope.Ast
 {
@@ -15,11 +16,11 @@ namespace Kaleidoscope.Ast
 
         public override ExprType NodeType { get; protected set; }
 
-        public override void CodeGen(Context ctx)
+        public override Value CodeGen(Context ctx)
         {
             if (ctx.NamedValues.TryGetValue(this.Name, out var value))
             {
-                ctx.ValueStack.Push(value);
+                return value;
             }
             else
             {

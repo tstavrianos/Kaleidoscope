@@ -1,6 +1,7 @@
 using System;
 using Kaleidoscope.Compiler;
-using LLVMSharp;
+using Llvm.NET.Interop;
+using Llvm.NET.Values;
 
 namespace Kaleidoscope.Ast
 {
@@ -18,43 +19,36 @@ namespace Kaleidoscope.Ast
         public ExprAst Body { get; }
 
         public override ExprType NodeType { get; protected set; }
-        public override void CodeGen(Context ctx)
+        public override Value CodeGen(Context ctx)
         {
-            var function = LLVM.GetNamedFunction(ctx.Module, this.Proto.Name);
-            if (function.Pointer == IntPtr.Zero)
+            var function = ctx.GetOrDeclareFunction( this.Proto );
+            if( !function.IsDeclaration )
             {
-                this.Proto.CodeGen(ctx);
-                function = ctx.ValueStack.Pop();
+                throw new Exception( $"Function {function.Name} cannot be redefined in the same module" );
             }
-
-            if (function.Pointer == IntPtr.Zero)
-            {
-                ctx.ValueStack.Push(default);
-                return;
-            }
-            
-            ctx.NamedValues.Clear();
-
-            // Create a new basic block to start insertion into.
-            LLVM.PositionBuilderAtEnd(ctx.Builder, LLVM.AppendBasicBlock(function, "entry"));
 
             try
             {
-                this.Body.CodeGen(ctx);
+                var entryBlock = function.AppendBasicBlock( "entry" );
+                ctx.InstructionBuilder.PositionAtEnd( entryBlock );
+                ctx.NamedValues.Clear( );
+                var index = 0;
+                foreach( var param in this.Proto.Arguments )
+                {
+                    ctx.NamedValues[ param ] = function.Parameters[ index ];
+                    ++index;
+                }
+
+                var funcReturn = this.Body.CodeGen( ctx );
+                ctx.InstructionBuilder.Return( funcReturn );
+                function.Verify( );
+                return function;
             }
-            catch (Exception)
+            catch( Exception )
             {
-                LLVM.DeleteFunction(function);
+                function.EraseFromParent( );
                 throw;
             }
-
-            // Finish off the function.
-            LLVM.BuildRet(ctx.Builder, ctx.ValueStack.Pop());
-
-            // Validate the generated code, checking for consistency.
-            LLVM.VerifyFunction(function, LLVMVerifierFailureAction.LLVMPrintMessageAction);
-
-            ctx.ValueStack.Push(function);   
         }
     }
 }
