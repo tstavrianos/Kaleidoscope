@@ -1,3 +1,6 @@
+using System;
+using Kaleidoscope.Compiler;
+
 namespace Kaleidoscope.Ast
 {
     public sealed class VariableExprAst : ExprAst
@@ -12,9 +15,16 @@ namespace Kaleidoscope.Ast
 
         public override ExprType NodeType { get; protected set; }
 
-        protected internal override ExprAst Accept(ExprVisitor visitor)
+        public override void CodeGen(Context ctx)
         {
-            return visitor.VisitVariableExprAst(this);
+            if (ctx.NamedValues.TryGetValue(this.Name, out var value))
+            {
+                ctx.ValueStack.Push(value);
+            }
+            else
+            {
+                throw new Exception($"Unknown variable name {this.Name}");
+            }
         }
     }
 }

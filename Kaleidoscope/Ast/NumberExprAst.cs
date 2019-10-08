@@ -1,3 +1,6 @@
+using Kaleidoscope.Compiler;
+using LLVMSharp;
+
 namespace Kaleidoscope.Ast
 {
     public sealed class NumberExprAst : ExprAst
@@ -12,9 +15,9 @@ namespace Kaleidoscope.Ast
 
         public override ExprType NodeType { get; protected set; }
 
-        protected internal override ExprAst Accept(ExprVisitor visitor)
+        public override void CodeGen(Context ctx)
         {
-            return visitor.VisitNumberExprAst(this);
+            ctx.ValueStack.Push(LLVM.ConstReal(LLVM.DoubleType(), this.Value));
         }
     }
 }

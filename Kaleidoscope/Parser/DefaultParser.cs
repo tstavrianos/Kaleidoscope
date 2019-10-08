@@ -229,7 +229,7 @@ namespace Kaleidoscope.Parser
             }
 
             // Make an anonymous proto.
-            var proto = new PrototypeAst(string.Empty, new List<string>());
+            var proto = new PrototypeAst("__anon_expr", new List<string>());
             return new FunctionAst(proto, e);
         }
 

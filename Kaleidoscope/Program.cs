@@ -1,8 +1,9 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.IO;
+using Kaleidoscope.Compiler;
 using Kaleidoscope.Lexer;
 using Kaleidoscope.Parser;
+using LLVMSharp;
 
 namespace Kaleidoscope
 {
@@ -10,6 +11,7 @@ namespace Kaleidoscope
     {
         private static ILexer _lexer;
         private static IParser _parser;
+        private static Context _ctx;
         static void Main(string[] args)
         {
             if (args.Length != 1 || !File.Exists(args[0])) return;
@@ -20,6 +22,10 @@ namespace Kaleidoscope
                 ['-'] = 20,
                 ['*'] = 40
             };
+            
+            var module = LLVM.ModuleCreateWithName("my cool jit");
+            var builder = LLVM.CreateBuilder();
+            _ctx = new Context(module, builder);
 
             _lexer = new DefaultLexer(File.OpenText(args[0]), binopPrecedence);
             _parser = new DefaultParser(_lexer);
@@ -48,9 +54,12 @@ namespace Kaleidoscope
             }
         }
         
-        static void HandleDefinition() {
-            if (_parser.ParseDefinition() != null) {
-                Console.WriteLine("Parsed a function definition");
+        static void HandleDefinition()
+        {
+            var data = _parser.ParseDefinition();
+            if (data != null) {
+                data.CodeGen(_ctx);
+                LLVM.DumpValue(_ctx.ValueStack.Pop());
             } else {
                 // Skip token for error recovery.
                 _lexer.GetNextToken();
@@ -58,8 +67,10 @@ namespace Kaleidoscope
         }
         
         static void HandleExtern() {
-            if (_parser.ParseExtern() != null) {
-                Console.WriteLine("Parsed an extern");
+            var data = _parser.ParseExtern();
+            if (data != null) {
+                data.CodeGen(_ctx);
+                LLVM.DumpValue(_ctx.ValueStack.Pop());
             } else {
                 // Skip token for error recovery.
                 _lexer.GetNextToken();
@@ -67,9 +78,10 @@ namespace Kaleidoscope
         }
         
         static void HandleTopLevelExpression() {
-            // Evaluate a top-level expression into an anonymous function.
-            if (_parser.ParseTopLevelExpr() != null) {
-                Console.WriteLine("Parsed a top-level expr");
+            var data = _parser.ParseTopLevelExpr();
+            if (data != null) {
+                data.CodeGen(_ctx);
+                LLVM.DumpValue(_ctx.ValueStack.Pop());
             } else {
                 // Skip token for error recovery.
                 _lexer.GetNextToken();
