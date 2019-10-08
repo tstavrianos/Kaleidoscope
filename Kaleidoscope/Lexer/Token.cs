@@ -1,11 +1,11 @@
 namespace Kaleidoscope.Lexer
 {
-    public static class Token
+    public enum Token
     {
-        public const int Eof = -1;
-        public const int Def = -2;
-        public const int Extern = -3;
-        public const int Identifier = -4;
-        public const int Number = -5;
+        Eof = -1,
+        Def = -2,
+        Extern = -3,
+        Identifier = -4,
+        Number = -5
     }
 }
