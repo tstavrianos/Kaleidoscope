@@ -16,12 +16,18 @@ namespace Kaleidoscope.Compiler
         public readonly InstructionBuilder InstructionBuilder;
         public readonly IDictionary<string, Value> NamedValues = new Dictionary<string, Value>( );
         public readonly IDictionary<string, PrototypeAst> FunctionDeclarations = new Dictionary<string, PrototypeAst>();
-        public BitcodeModule Module { get; }
+        public BitcodeModule Module;
+        public FunctionPassManager FunctionPassManager;
+        private readonly bool _disableOptimizations;
+        internal readonly KaleidoscopeJIT _jit = new KaleidoscopeJIT( );
+        private readonly Dictionary<string, ulong> FunctionModuleMap = new Dictionary<string, ulong>( );
+        public readonly IDictionary<string, PrototypeAst> FunctionProtos = new Dictionary<string, PrototypeAst>();
 
-        public Context()
+        public Context(bool disableOptimizations)
         {
+            this._disableOptimizations = disableOptimizations;
             this.Ctx = new Llvm.NET.Context( );
-            this.Module = this.Ctx.CreateBitcodeModule( "Kaleidoscope" );
+            this.InitializeModuleAndPassManager( );
             this.InstructionBuilder = new InstructionBuilder( this.Ctx );
         }
         
@@ -46,14 +52,43 @@ namespace Kaleidoscope.Compiler
             return retVal;
         }
 
-        #region IDisposable
+        public IrFunction GetFunction(string name)
+        {
+            var ret = this.Module.GetFunction(name);
+            if (ret != null) return ret;
+
+            if (this.FunctionProtos.TryGetValue(name, out var proto))
+            {
+                return (IrFunction)proto.CodeGen(this);
+            }
+
+            return null;
+        }
+        
+        public void InitializeModuleAndPassManager( )
+        {
+            this.Module = this.Ctx.CreateBitcodeModule( );
+            this.Module.Layout = this._jit.TargetMachine.TargetData;
+            this.FunctionPassManager = new FunctionPassManager(this.Module );
+
+            if( !this._disableOptimizations )
+            {
+                this.FunctionPassManager.AddInstructionCombiningPass( )
+                    .AddReassociatePass( )
+                    .AddGVNPass( )
+                    .AddCFGSimplificationPass( );
+            }
+
+            this.FunctionPassManager.Initialize( );
+        }
+
 
         public void Dispose()
         {
             this.Ctx?.Dispose();
+            this.FunctionPassManager?.Dispose();
+            this._jit?.Dispose();
             this.Module?.Dispose();
         }
-
-        #endregion
     }
 }

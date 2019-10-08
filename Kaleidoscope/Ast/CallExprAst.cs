@@ -24,17 +24,7 @@ namespace Kaleidoscope.Ast
 
         public override Value CodeGen(Context ctx)
         {
-            IrFunction function;
-
-            // try for an extern function declaration
-            if( ctx.FunctionDeclarations.TryGetValue( this.Callee, out var target ) )
-            {
-                function = ctx.GetOrDeclareFunction( target );
-            }
-            else
-            {
-                function = ctx.Module.GetFunction( this.Callee ) ?? throw new Exception( $"Definition for function {this.Callee} not found" );
-            }
+            var function = ctx.GetFunction(this.Callee);
 
             var args = this.Arguments.Select( x => x.CodeGen( ctx ) ).ToArray( );
             return ctx.InstructionBuilder.Call( function, args ).RegisterName( "calltmp" );

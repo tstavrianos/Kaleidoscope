@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Kaleidoscope.Compiler;
 using Llvm.NET.Values;
 
