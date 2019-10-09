@@ -169,6 +169,24 @@ namespace Kaleidoscope.Ast
                 this.Body = body;
             }
         }
+        public sealed class Unary : Expr 
+        {
+            public readonly char Opcode;
+            public readonly Expr Operand;
+            public override T Accept<T>(IVisitor<T> visitor)
+            {
+                return visitor.Visit(this);
+            }
+            public override void Accept(IVisitor visitor)
+            {
+                visitor.Visit(this);
+            }
+            public Unary(char opcode, Expr operand)
+            {
+                this.Opcode = opcode;
+                this.Operand = operand;
+            }
+        }
         public interface IVisitor<out T>
         {
             T Visit (Binary expr);
@@ -179,6 +197,7 @@ namespace Kaleidoscope.Ast
             T Visit (Function expr);
             T Visit (If expr);
             T Visit (For expr);
+            T Visit (Unary expr);
         }
         public interface IVisitor
         {
@@ -190,6 +209,7 @@ namespace Kaleidoscope.Ast
             void Visit (Function expr);
             void Visit (If expr);
             void Visit (For expr);
+            void Visit (Unary expr);
         }
     }
 }

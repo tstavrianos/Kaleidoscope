@@ -20,13 +20,15 @@ namespace Kaleidoscope.Compiler
         private readonly bool _disableOptimizations;
         internal readonly KaleidoscopeJit Jit = new KaleidoscopeJit( );
         internal readonly IDictionary<string, Expr.Prototype> FunctionProtos = new Dictionary<string, Expr.Prototype>();
+        private readonly Session _session;
 
-        public CodeGenVisitor(bool disableOptimizations)
+        public CodeGenVisitor(bool disableOptimizations, Session session)
         {
             this._disableOptimizations = disableOptimizations;
             this._ctx = new Context( );
             this.InitializeModuleAndPassManager( );
             this._instructionBuilder = new InstructionBuilder( this._ctx );
+            this._session = session;
         }
 
         private IrFunction GetOrDeclareFunction(Expr.Prototype prototype )
@@ -119,7 +121,12 @@ namespace Kaleidoscope.Compiler
         {
             var function = this.GetFunction(expr.Callee);
 
-            var args = expr.Arguments.Select( x => x.Accept(this)).ToArray( );
+            var args = new Value[Math.Max(expr.Arguments.Length, 0)];
+            for (var i = 0; i < args.Length; i++)
+            {
+                args[i] = expr.Arguments[i].Accept(this);
+            }
+            
             return this._instructionBuilder.Call(function, args).RegisterName("calltmp");
         }
 
@@ -148,6 +155,11 @@ namespace Kaleidoscope.Compiler
             if (function == null)
             {
                 return null;
+            }
+
+            if (stmt.Proto.IsOperator && stmt.Proto.Arguments.Length == 2)
+            {
+                this._session.AddBinOpPrecedence(stmt.Proto.Name[^1], stmt.Proto.Precedence);
             }
 
             try
@@ -272,6 +284,20 @@ namespace Kaleidoscope.Compiler
 
                 return this._ctx.DoubleType.GetNullValue();
             }
+        }
+
+        public Value Visit(Expr.Unary expr)
+        {
+            var op = expr.Operand.Accept(this);
+            if (op == null) return null;
+
+            var f = this.GetFunction($"unary{expr.Opcode}");
+            if (f == null)
+            {
+                Console.WriteLine("Unknown unary operator");
+                return null;
+            }
+            return this._instructionBuilder.Call(f, op).RegisterName("unop");
         }
     }
 }

@@ -8,8 +8,6 @@ namespace Kaleidoscope.Lexer
 
         double LastNumber { get; }
 
-        int GetTokPrecedence();
-
         int GetNextToken();
     }
 }

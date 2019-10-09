@@ -112,7 +112,8 @@ namespace AstGen
                 "Prototype : string name, string[] arguments, bool isOperator, int precedence",
                 "Function  : Prototype proto, Expr body",
                 "If        : Expr cond, Expr thenExpr, Expr elseExpr",
-                "For       : string varName, Expr start, Expr end, Expr step, Expr body"
+                "For       : string varName, Expr start, Expr end, Expr step, Expr body",
+                "Unary     : char opcode, Expr operand"
             };
 
             Build(types, "Expr");

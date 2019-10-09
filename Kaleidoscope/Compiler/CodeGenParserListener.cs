@@ -22,8 +22,8 @@ namespace Kaleidoscope.Compiler
         {
             var value = this._visitor.Visit(data);
             if (value == null) return;
-            Console.WriteLine("ExitHandleDefinition");
-            Console.WriteLine(value);
+            //Console.WriteLine("ExitHandleDefinition");
+            //Console.WriteLine(value);
             this._visitor.Jit.AddEagerlyCompiledModule(this._visitor.Module);
             this._visitor.InitializeModuleAndPassManager();
         }
@@ -36,8 +36,8 @@ namespace Kaleidoscope.Compiler
         {
             var value = this._visitor.Visit(data);
             if (value == null) return;
-            Console.WriteLine("ExitHandleExtern");
-            Console.WriteLine(value);
+            //Console.WriteLine("ExitHandleExtern");
+            //Console.WriteLine(value);
             this._visitor.FunctionProtos[data.Name] = data;
         }
 
@@ -49,8 +49,8 @@ namespace Kaleidoscope.Compiler
         {
             var value = this._visitor.Visit(data);
             if (value == null) return;
-            Console.WriteLine("ExitHandleTopLevelExpression");
-            Console.WriteLine(value);
+            //Console.WriteLine("ExitHandleTopLevelExpression");
+            //Console.WriteLine(value);
             var jitHandle = this._visitor.Jit.AddEagerlyCompiledModule(this._visitor.Module);
             this._visitor.InitializeModuleAndPassManager();
             var nativeFunc = this._visitor.Jit.GetFunctionDelegate<KaleidoscopeJit.CallbackHandler0>(data.Proto.Name);

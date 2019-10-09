@@ -14,8 +14,6 @@ namespace Kaleidoscope.Lexer
 
         private readonly StringBuilder _numberBuilder = new StringBuilder();
 
-        private readonly Dictionary<char, int> _binopPrecedence;
-
         private int _lastChar = ' ';
 
         public int CurrentToken { get; private set; }
@@ -24,21 +22,9 @@ namespace Kaleidoscope.Lexer
 
         public double LastNumber { get; private set; }
 
-        public DefaultLexer(TextReader reader, Dictionary<char, int> binOpPrecedence)
+        public DefaultLexer(TextReader reader)
         {
             this._reader = reader;
-            this._binopPrecedence = binOpPrecedence;
-        }
-
-        public int GetTokPrecedence()
-        {
-            // Make sure it's a declared binop.
-            if (this._binopPrecedence.TryGetValue((char)this.CurrentToken, out var tokPrec))
-            {
-                return tokPrec;
-            }
-
-            return -1;
         }
 
         public int GetNextToken()

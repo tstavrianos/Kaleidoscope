@@ -1,5 +1,7 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Runtime.CompilerServices;
 using Kaleidoscope.Compiler;
 using Kaleidoscope.Lexer;
 using Kaleidoscope.Parser;
@@ -9,35 +11,37 @@ namespace Kaleidoscope
 {
     internal static class Program
     {
+        
+        [MethodImpl(MethodImplOptions.AggressiveInlining)] 
+        internal static bool IsAscii(this int c)
+        {
+            return c >= 0 && c < 128;
+        }
+
         static void Main(string[] args)
         {
             if (args.Length != 1 || !File.Exists(args[0])) return;
-            var binopPrecedence = new Dictionary<char, int>
-            {
-                ['<'] = 10,
-                ['+'] = 20,
-                ['-'] = 20,
-                ['*'] = 40
-            };
             using (InitializeLLVM())
             {
                 RegisterNative();
 
 
-                var visitor = new CodeGenVisitor(false);
+                var session = new Session();
+                var visitor = new CodeGenVisitor(false, session);
                 var listener = new CodeGenParserListener(visitor);
 
-                var lexer = new DefaultLexer(File.OpenText(args[0]), binopPrecedence);
-                var parser = new DefaultParser(lexer, listener);
+                var lexer = new DefaultLexer(File.OpenText(args[0]));
+                var parser = new DefaultParser(lexer, listener, session);
 
                 lexer.GetNextToken();
 
                 while (true)
                 {
+                    //Console.WriteLine(lexer.CurrentToken);
                     switch (lexer.CurrentToken)
                     {
                         case (int) Token.Eof:
-                            visitor.Dispose();
+                            //visitor.Dispose();
                             return;
                         case ';':
                             lexer.GetNextToken();

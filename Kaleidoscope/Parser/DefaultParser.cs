@@ -9,14 +9,17 @@ namespace Kaleidoscope.Parser
     {
         private readonly ILexer _scanner;
         private readonly BaseParserListener _baseListener;
+        private readonly Session _session;
 
-        public DefaultParser(ILexer scanner, IParserListener baseListener)
+        public DefaultParser(ILexer scanner, IParserListener baseListener, Session session)
         {
             this._scanner = scanner;
             this._baseListener = new BaseParserListener(baseListener);
+            this._session = session;
         }
         public void HandleDefinition()
         {
+            //Console.WriteLine($"HandleDefinition: {this._scanner.CurrentToken}");
             this._baseListener.EnterRule("HandleDefinition");
 
             var functionAst = this.ParseDefinition();
@@ -36,6 +39,7 @@ namespace Kaleidoscope.Parser
 
         public void HandleExtern()
         {
+            //Console.WriteLine($"HandleExtern: {this._scanner.CurrentToken}");
             this._baseListener.EnterRule("HandleExtern");
 
             var prototypeAst = this.ParseExtern();
@@ -55,6 +59,7 @@ namespace Kaleidoscope.Parser
 
         public void HandleTopLevelExpression()
         {
+            //Console.WriteLine($"HandleTopLevelExpression: {this._scanner.CurrentToken}");
             // Evaluate a top-level expression into an anonymous function.
             this._baseListener.EnterRule("HandleTopLevelExpression");
 
@@ -79,6 +84,7 @@ namespace Kaleidoscope.Parser
         //   ::= identifier '(' expression* ')'
         private Expr ParseIdentifierExpr()
         {
+            //Console.WriteLine($"ParseIdentifierExpr: {this._scanner.CurrentToken}");
             var idName = this._scanner.LastIdentifier;
             
             this._scanner.GetNextToken();  // eat identifier.
@@ -128,6 +134,7 @@ namespace Kaleidoscope.Parser
         // numberexpr ::= number
         private Expr ParseNumberExpr()
         {
+            //Console.WriteLine($"ParseNumberExpr: {this._scanner.CurrentToken}");
             var result = new Expr.Number(this._scanner.LastNumber);
             this._scanner.GetNextToken();
             return result;
@@ -136,6 +143,7 @@ namespace Kaleidoscope.Parser
         // parenexpr ::= '(' expression ')'
         private Expr ParseParenExpr()
         {
+            //Console.WriteLine($"ParseParenExpr: {this._scanner.CurrentToken}");
             this._scanner.GetNextToken();  // eat (.
             var v = this.ParseExpression();
             if (v == null)
@@ -160,6 +168,7 @@ namespace Kaleidoscope.Parser
         //   ::= parenexpr
         private Expr ParsePrimary()
         {
+            //Console.WriteLine($"ParsePrimary: {this._scanner.CurrentToken}");
             switch (this._scanner.CurrentToken)
             {
                 case (int)Token.Identifier:
@@ -173,41 +182,32 @@ namespace Kaleidoscope.Parser
                 case (int)Token.For:
                     return this.ParseFor();
                 default:
-                    Console.WriteLine("unknown token when expecting an expression");
+                    Console.WriteLine($"unknown token when expecting an expression");
                     return null;
             }
         }
 
-        // binoprhs
-        //   ::= ('+' primary)*
         private Expr ParseBinOpRhs(int exprPrec, Expr lhs)
         {
-            // If this is a binop, find its precedence.
+            //Console.WriteLine($"ParseBinOpRhs: {this._scanner.CurrentToken}");
             while (true)
             {
-                var tokPrec = this._scanner.GetTokPrecedence();
-
-                // If this is a binop that binds at least as tightly as the current binop,
-                // consume it, otherwise we are done.
+                var tokPrec = this._session.GetTokPrecedence(this._scanner.CurrentToken);
                 if (tokPrec < exprPrec)
                 {
                     return lhs;
                 }
 
-                // Okay, we know this is a binop.
                 var binOp = this._scanner.CurrentToken;
                 this._scanner.GetNextToken();  // eat binop
 
-                // Parse the primary expression after the binary operator.
-                var rhs = this.ParsePrimary();
+                var rhs = this.ParseUnary();
                 if (rhs == null)
                 {
                     return null;
                 }
 
-                // If BinOp binds less tightly with RHS than the operator after RHS, let
-                // the pending operator take RHS as its LHS.
-                var nextPrec = this._scanner.GetTokPrecedence();
+                var nextPrec = this._session.GetTokPrecedence(this._scanner.CurrentToken);
                 if (tokPrec < nextPrec)
                 {
                     rhs = this.ParseBinOpRhs(tokPrec + 1, rhs);
@@ -217,7 +217,6 @@ namespace Kaleidoscope.Parser
                     }
                 }
 
-                // Merge LHS/RHS.
                 lhs = new Expr.Binary((char)binOp, lhs, rhs);
             }
         }
@@ -227,7 +226,8 @@ namespace Kaleidoscope.Parser
         //
         private Expr ParseExpression()
         {
-            var lhs = this.ParsePrimary();
+            //Console.WriteLine($"ParseExpression: {this._scanner.CurrentToken}");
+            var lhs = this.ParseUnary();
             return lhs == null ? null : this.ParseBinOpRhs(0, lhs);
         }
 
@@ -235,6 +235,7 @@ namespace Kaleidoscope.Parser
         //   ::= id '(' id* ')'
         private Expr.Prototype ParsePrototype()
         {
+            //Console.WriteLine($"ParsePrototype: {this._scanner.CurrentToken}");
             var kind = 0;
             var precedence = 30;
             var fnName = string.Empty;
@@ -246,9 +247,26 @@ namespace Kaleidoscope.Parser
                     fnName = this._scanner.LastIdentifier;
                     this._scanner.GetNextToken();
                     break;
+                case (int)Token.Unary:
+                    this._scanner.GetNextToken();
+                    if (!this._scanner.CurrentToken.IsAscii())
+                    {
+                        Console.WriteLine("Expected unary operator");
+                        return null;
+                    }
+
+                    fnName = $"unary{(char)this._scanner.CurrentToken}";
+                    kind = 1;
+                    this._scanner.GetNextToken();
+                    break;
                 case (int)Token.Binary:
                     this._scanner.GetNextToken();
-                    fnName = "binary" + (char)this._scanner.CurrentToken;
+                    if (!this._scanner.CurrentToken.IsAscii())
+                    {
+                        Console.WriteLine("Expected unary operator");
+                        return null;
+                    }
+                    fnName = $"binary{(char)this._scanner.CurrentToken}";
                     kind = 2;
                     this._scanner.GetNextToken();
 
@@ -297,8 +315,9 @@ namespace Kaleidoscope.Parser
         }
 
         // definition ::= 'def' prototype expression
-        public Expr.Function ParseDefinition()
+        private Expr.Function ParseDefinition()
         {
+            //Console.WriteLine($"ParseDefinition: {this._scanner.CurrentToken}");
             this._scanner.GetNextToken(); // eat def.
             var proto = this.ParsePrototype();
 
@@ -312,8 +331,9 @@ namespace Kaleidoscope.Parser
         }
 
         /// toplevelexpr ::= expression
-        public Expr.Function ParseTopLevelExpr()
+        private Expr.Function ParseTopLevelExpr()
         {
+            //Console.WriteLine($"ParseTopLevelExpr: {this._scanner.CurrentToken}");
             var e = this.ParseExpression();
             if (e == null)
             {
@@ -326,14 +346,16 @@ namespace Kaleidoscope.Parser
         }
 
         /// external ::= 'extern' prototype
-        public Expr.Prototype ParseExtern()
+        private Expr.Prototype ParseExtern()
         {
+            //Console.WriteLine($"ParseExtern: {this._scanner.CurrentToken}");
             this._scanner.GetNextToken();  // eat extern.
             return this.ParsePrototype();
         }
 
         private Expr.If ParseIf()
         {
+            //Console.WriteLine($"ParseIf: {this._scanner.CurrentToken}");
             this._scanner.GetNextToken();
 
             var cond = this.ParseExpression();
@@ -362,6 +384,7 @@ namespace Kaleidoscope.Parser
 
         private Expr.For ParseFor()
         {
+            //Console.WriteLine($"ParseFor: {this._scanner.CurrentToken}");
             this._scanner.GetNextToken();
 
             if (this._scanner.CurrentToken != (int) Token.Identifier)
@@ -409,6 +432,18 @@ namespace Kaleidoscope.Parser
 
             var body = this.ParseExpression();
             return body == null ? null : new Expr.For(idName, start, end, step, body);
+        }
+
+        private Expr ParseUnary()
+        {
+            //Console.WriteLine($"ParseUnary: {this._scanner.CurrentToken}");
+            if(!this._scanner.CurrentToken.IsAscii() || this._scanner.CurrentToken == '(' || this._scanner.CurrentToken == ',')
+                return this.ParsePrimary();
+
+            var op = this._scanner.CurrentToken;
+            this._scanner.GetNextToken();
+            var operand = this.ParseUnary();
+            return operand != null ? new Expr.Unary((char)op, operand) : null;
         }
     }
 }
