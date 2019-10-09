@@ -121,6 +121,50 @@ namespace Kaleidoscope.Ast
                 this.Body = body;
             }
         }
+        public sealed class If : Expr 
+        {
+            public readonly Expr Cond;
+            public readonly Expr ThenExpr;
+            public readonly Expr ElseExpr;
+            public override T Accept<T>(IVisitor<T> visitor)
+            {
+                return visitor.Visit(this);
+            }
+            public override void Accept(IVisitor visitor)
+            {
+                visitor.Visit(this);
+            }
+            public If(Expr cond, Expr thenExpr, Expr elseExpr)
+            {
+                this.Cond = cond;
+                this.ThenExpr = thenExpr;
+                this.ElseExpr = elseExpr;
+            }
+        }
+        public sealed class For : Expr 
+        {
+            public readonly string VarName;
+            public readonly Expr Start;
+            public readonly Expr End;
+            public readonly Expr Step;
+            public readonly Expr Body;
+            public override T Accept<T>(IVisitor<T> visitor)
+            {
+                return visitor.Visit(this);
+            }
+            public override void Accept(IVisitor visitor)
+            {
+                visitor.Visit(this);
+            }
+            public For(string varName, Expr start, Expr end, Expr step, Expr body)
+            {
+                this.VarName = varName;
+                this.Start = start;
+                this.End = end;
+                this.Step = step;
+                this.Body = body;
+            }
+        }
         public interface IVisitor<out T>
         {
             T Visit (Binary expr);
@@ -129,6 +173,8 @@ namespace Kaleidoscope.Ast
             T Visit (Variable expr);
             T Visit (Prototype expr);
             T Visit (Function expr);
+            T Visit (If expr);
+            T Visit (For expr);
         }
         public interface IVisitor
         {
@@ -138,6 +184,8 @@ namespace Kaleidoscope.Ast
             void Visit (Variable expr);
             void Visit (Prototype expr);
             void Visit (Function expr);
+            void Visit (If expr);
+            void Visit (For expr);
         }
     }
 }

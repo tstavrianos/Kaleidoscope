@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
@@ -61,17 +60,32 @@ namespace Kaleidoscope.Lexer
                 this.LastIdentifier = this._identifierBuilder.ToString();
                 this._identifierBuilder.Clear();
 
-                if (string.Equals(this.LastIdentifier, "def", StringComparison.Ordinal))
+                switch (this.LastIdentifier)
                 {
-                    this.CurrentToken = (int)Token.Def;
-                }
-                else if (string.Equals(this.LastIdentifier, "extern", StringComparison.Ordinal))
-                {
-                    this.CurrentToken = (int)Token.Extern;
-                }
-                else
-                {
-                    this.CurrentToken = (int)Token.Identifier;
+                    case "def":
+                        this.CurrentToken = (int)Token.Def;
+                        break;
+                    case "extern":
+                        this.CurrentToken = (int)Token.Extern;
+                        break;
+                    case "if":
+                        this.CurrentToken = (int)Token.If;
+                        break;
+                    case "then":
+                        this.CurrentToken = (int)Token.Then;
+                        break;
+                    case "else":
+                        this.CurrentToken = (int)Token.Else;
+                        break;
+                    case "for":
+                        this.CurrentToken = (int)Token.For;
+                        break;
+                    case "in":
+                        this.CurrentToken = (int)Token.In;
+                        break;
+                    default:
+                        this.CurrentToken = (int)Token.Identifier;
+                        break;
                 }
 
                 return this.CurrentToken;

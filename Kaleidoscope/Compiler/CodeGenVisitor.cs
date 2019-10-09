@@ -13,7 +13,7 @@ namespace Kaleidoscope.Compiler
     {
         private readonly Context _ctx;
         private readonly InstructionBuilder _instructionBuilder;
-        private readonly IDictionary<string, Value> _namedValues = new Dictionary<string, Value>( );
+        private readonly ScopeStack<Value> _namedValues = new ScopeStack<Value>( );
         internal BitcodeModule Module;
         private FunctionPassManager _functionPassManager;
         private readonly bool _disableOptimizations;
@@ -147,28 +147,129 @@ namespace Kaleidoscope.Compiler
             {
                 return null;
             }
+
+            try
+            {
+                var entryBlock = function.AppendBasicBlock("entry");
+                this._instructionBuilder.PositionAtEnd(entryBlock);
+                using (this._namedValues.EnterScope())
+                {
+
+                    var index = 0;
+                    foreach (var param in stmt.Proto.Arguments)
+                    {
+                        this._namedValues[param] = function.Parameters[index];
+                        ++index;
+                    }
+
+                    var funcReturn = stmt.Body.Accept(this);
+                    this._instructionBuilder.Return(funcReturn);
+                    function.Verify();
+                    this._functionPassManager.Run(function);
+                    return function;
+                }
+            }
+            catch
+            {
+                function.EraseFromParent();
+                throw ;
+            }
+        }
+
+        public Value Visit(Expr.If expr)
+        {
+            var condV  = expr.Cond.Accept(this);
+            if (condV  == null) return null;
+
+            condV = this._instructionBuilder.Compare(RealPredicate.OrderedAndNotEqual, condV , this._ctx.CreateConstant(0.0)).RegisterName("ifcond");
             
-            var entryBlock = function.AppendBasicBlock( "entry" );
-            this._instructionBuilder.PositionAtEnd( entryBlock );
-            this._namedValues.Clear( );
-            var index = 0;
-            foreach( var param in stmt.Proto.Arguments )
+            var theFunction = this._instructionBuilder.InsertBlock.ContainingFunction;
+            var thenBb  = theFunction.AppendBasicBlock( "then" );
+            var elseBb  = theFunction.AppendBasicBlock( "else" );
+            var mergeBb  = theFunction.AppendBasicBlock( "ifcont" );
+            this._instructionBuilder.Branch( condV, thenBb , elseBb  );
+            
+            this._instructionBuilder.PositionAtEnd( thenBb  );
+            var thenV  = expr.ThenExpr.Accept( this );
+            if( thenV  == null )
             {
-                this._namedValues[ param ] = function.Parameters[ index ];
-                ++index;
+                return null;
             }
 
-            var funcReturn = stmt.Body.Accept( this );
-            if (funcReturn != null)
-            {
-                this._instructionBuilder.Return(funcReturn);
-                function.Verify();
-                this._functionPassManager.Run(function);
-                return function;
-            }
+            this._instructionBuilder.Branch( mergeBb  );
 
-            function.EraseFromParent();
-            return null;
+            // capture the insert in case generating else adds new blocks
+            thenBb   = this._instructionBuilder.InsertBlock;
+
+            // generate else block
+            this._instructionBuilder.PositionAtEnd( elseBb  );
+            var elseV  = expr.ElseExpr.Accept( this );
+            if( elseV  == null )
+            {
+                return null;
+            }
+            
+            this._instructionBuilder.Branch( mergeBb  );
+            elseBb = this._instructionBuilder.InsertBlock;
+
+            // generate continue block
+            this._instructionBuilder.PositionAtEnd( mergeBb );
+            var pn = this._instructionBuilder.PhiNode( theFunction.Context.DoubleType )
+                .RegisterName( "ifresult" );
+
+            pn.AddIncoming(( thenV , thenBb  ),( elseV , elseBb ));
+            return pn;
+        }
+
+        public Value Visit(Expr.For expr)
+        {
+            var startVal = expr.Start.Accept(this);
+            if (startVal == null) return null;
+
+            var function = this._instructionBuilder.InsertBlock.ContainingFunction;
+            var preHeaderBb = this._instructionBuilder.InsertBlock;
+            var loopBb = function.AppendBasicBlock("loop");
+
+            this._instructionBuilder.Branch(loopBb);
+            this._instructionBuilder.PositionAtEnd( loopBb );
+
+            var variable = this._instructionBuilder.PhiNode(function.Context.DoubleType).RegisterName(expr.VarName);
+            variable.AddIncoming( startVal, preHeaderBb );
+            using (this._namedValues.EnterScope())
+            {
+                this._namedValues[expr.VarName] = variable;
+
+                var body = expr.Body.Accept(this);
+                if (body == null) return null;
+
+                Value stepVal = null;
+                if (expr.Step != null)
+                {
+                    stepVal = expr.Step.Accept(this);
+                    if (stepVal == null) return null;
+                }
+                else
+                {
+                    stepVal = this._ctx.CreateConstant(1.0);
+                }
+
+                var nextVar = this._instructionBuilder.FAdd(variable, stepVal);
+
+                var endCond = expr.End.Accept(this);
+                if (endCond == null) return null;
+
+                endCond = this._instructionBuilder
+                    .Compare(RealPredicate.OrderedAndNotEqual, endCond, this._ctx.CreateConstant(0.0))
+                    .RegisterName("loopcond");
+
+                var loopEndBb = this._instructionBuilder.InsertBlock;
+                var afterBb = function.AppendBasicBlock("afterloop");
+                this._instructionBuilder.Branch(endCond, loopBb, afterBb);
+                this._instructionBuilder.PositionAtEnd(afterBb);
+                variable.AddIncoming(nextVar, loopEndBb);
+
+                return this._ctx.DoubleType.GetNullValue();
+            }
         }
     }
 }

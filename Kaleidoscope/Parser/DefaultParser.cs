@@ -168,6 +168,10 @@ namespace Kaleidoscope.Parser
                     return this.ParseNumberExpr();
                 case '(':
                     return this.ParseParenExpr();
+                case (int)Token.If:
+                    return this.ParseIf();
+                case (int)Token.For:
+                    return this.ParseFor();
                 default:
                     Console.WriteLine("unknown token when expecting an expression");
                     return null;
@@ -298,6 +302,85 @@ namespace Kaleidoscope.Parser
         {
             this._scanner.GetNextToken();  // eat extern.
             return this.ParsePrototype();
+        }
+
+        private Expr.If ParseIf()
+        {
+            this._scanner.GetNextToken();
+
+            var cond = this.ParseExpression();
+            if (cond == null) return null;
+
+            if (this._scanner.CurrentToken != (int) Token.Then)
+            {
+                Console.WriteLine("expected then");
+                return null;
+            }
+            this._scanner.GetNextToken();
+
+            var then = this.ParseExpression();
+            if (then == null) return null;
+            
+            if (this._scanner.CurrentToken != (int) Token.Else)
+            {
+                Console.WriteLine("expected else");
+                return null;
+            }
+            this._scanner.GetNextToken();
+
+            var elseExpr = this.ParseExpression();
+            return elseExpr == null ? null : new Expr.If(cond, then, elseExpr);
+        }
+
+        private Expr.For ParseFor()
+        {
+            this._scanner.GetNextToken();
+
+            if (this._scanner.CurrentToken != (int) Token.Identifier)
+            {
+                Console.WriteLine("expected identifier after for");
+                return null;
+            }
+
+            var idName = this._scanner.LastIdentifier;
+            this._scanner.GetNextToken();
+
+            if (this._scanner.CurrentToken != '=')
+            {
+                Console.WriteLine("expected '=' after for");
+                return null;
+            }
+            this._scanner.GetNextToken();
+
+            var start = this.ParseExpression();
+            if (start == null) return null;
+            if (this._scanner.CurrentToken != ',')
+            {
+                Console.WriteLine("expected ',' after for start value");
+                return null;
+            }
+            this._scanner.GetNextToken();
+            
+            var end = this.ParseExpression();
+            if (end == null) return null;
+
+            Expr step = null;
+            if (this._scanner.CurrentToken == ',')
+            {
+                this._scanner.GetNextToken();
+                step = this.ParseExpression();
+                if (step == null) return null;
+            }
+
+            if (this._scanner.CurrentToken != (int) Token.In)
+            {
+                Console.WriteLine("expected 'in' after for");
+                return null;
+            }
+            this._scanner.GetNextToken();
+
+            var body = this.ParseExpression();
+            return body == null ? null : new Expr.For(idName, start, end, step, body);
         }
     }
 }
