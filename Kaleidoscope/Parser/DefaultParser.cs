@@ -8,16 +8,76 @@ namespace Kaleidoscope.Parser
     public sealed class DefaultParser: IParser
     {
         private readonly ILexer _scanner;
+        private readonly BaseParserListener _baseListener;
 
-        public DefaultParser(ILexer scanner)
+        public DefaultParser(ILexer scanner, IParserListener baseListener)
         {
             this._scanner = scanner;
+            this._baseListener = new BaseParserListener(baseListener);
         }
+        public void HandleDefinition()
+        {
+            this._baseListener.EnterRule("HandleDefinition");
+
+            var functionAst = this.ParseDefinition();
+
+            this._baseListener.ExitRule(functionAst);
+
+            if (functionAst != null)
+            {
+                this._baseListener.Listen();
+            }
+            else
+            {
+                // Skip token for error recovery.
+                this._scanner.GetNextToken();
+            }
+        }
+
+        public void HandleExtern()
+        {
+            this._baseListener.EnterRule("HandleExtern");
+
+            var prototypeAst = this.ParseExtern();
+
+            this._baseListener.ExitRule(prototypeAst);
+
+            if (prototypeAst != null)
+            {
+                this._baseListener.Listen();
+            }
+            else
+            {
+                // Skip token for error recovery.
+                this._scanner.GetNextToken();
+            }
+        }
+
+        public void HandleTopLevelExpression()
+        {
+            // Evaluate a top-level expression into an anonymous function.
+            this._baseListener.EnterRule("HandleTopLevelExpression");
+
+            var functionAst = this.ParseTopLevelExpr();
+
+            this._baseListener.ExitRule(functionAst);
+
+            if (functionAst != null)
+            {
+                this._baseListener.Listen();
+            }
+            else
+            {
+                // Skip token for error recovery.
+                this._scanner.GetNextToken();
+            }
+        }
+
 
         // identifierexpr
         //   ::= identifier
         //   ::= identifier '(' expression* ')'
-        private ExprAst ParseIdentifierExpr()
+        private Expr ParseIdentifierExpr()
         {
             var idName = this._scanner.LastIdentifier;
             
@@ -25,12 +85,12 @@ namespace Kaleidoscope.Parser
 
             if (this._scanner.CurrentToken != '(') // Simple variable ref.
             {
-                return new VariableExprAst(idName);
+                return new Expr.Variable(idName);
             }
 
             // Call.
             this._scanner.GetNextToken();  // eat (
-            var args = new List<ExprAst>();
+            var args = new List<Expr>();
 
             if (this._scanner.CurrentToken != ')')
             {
@@ -62,19 +122,19 @@ namespace Kaleidoscope.Parser
             // Eat the ')'.
             this._scanner.GetNextToken();
 
-            return new CallExprAst(idName, args);
+            return new Expr.Call(idName, args.ToArray());
         }
 
         // numberexpr ::= number
-        private ExprAst ParseNumberExpr()
+        private Expr ParseNumberExpr()
         {
-            ExprAst result = new NumberExprAst(this._scanner.LastNumber);
+            var result = new Expr.Number(this._scanner.LastNumber);
             this._scanner.GetNextToken();
             return result;
         }
 
         // parenexpr ::= '(' expression ')'
-        private ExprAst ParseParenExpr()
+        private Expr ParseParenExpr()
         {
             this._scanner.GetNextToken();  // eat (.
             var v = this.ParseExpression();
@@ -98,7 +158,7 @@ namespace Kaleidoscope.Parser
         //   ::= identifierexpr
         //   ::= numberexpr
         //   ::= parenexpr
-        private ExprAst ParsePrimary()
+        private Expr ParsePrimary()
         {
             switch (this._scanner.CurrentToken)
             {
@@ -116,7 +176,7 @@ namespace Kaleidoscope.Parser
 
         // binoprhs
         //   ::= ('+' primary)*
-        private ExprAst ParseBinOpRhs(int exprPrec, ExprAst lhs)
+        private Expr ParseBinOpRhs(int exprPrec, Expr lhs)
         {
             // If this is a binop, find its precedence.
             while (true)
@@ -154,14 +214,14 @@ namespace Kaleidoscope.Parser
                 }
 
                 // Merge LHS/RHS.
-                lhs = new BinaryExprAst((char)binOp, lhs, rhs);
+                lhs = new Expr.Binary((char)binOp, lhs, rhs);
             }
         }
 
         // expression
         //   ::= primary binoprhs
         //
-        private ExprAst ParseExpression()
+        private Expr ParseExpression()
         {
             var lhs = this.ParsePrimary();
             return lhs == null ? null : this.ParseBinOpRhs(0, lhs);
@@ -169,7 +229,7 @@ namespace Kaleidoscope.Parser
 
         // prototype
         //   ::= id '(' id* ')'
-        private PrototypeAst ParsePrototype()
+        private Expr.Prototype ParsePrototype()
         {
             if (this._scanner.CurrentToken != (int)Token.Identifier)
             {
@@ -201,11 +261,11 @@ namespace Kaleidoscope.Parser
 
             this._scanner.GetNextToken(); // eat ')'.
 
-            return new PrototypeAst(fnName, argNames);
+            return new Expr.Prototype(fnName, argNames.ToArray());
         }
 
         // definition ::= 'def' prototype expression
-        public FunctionAst ParseDefinition()
+        public Expr.Function ParseDefinition()
         {
             this._scanner.GetNextToken(); // eat def.
             var proto = this.ParsePrototype();
@@ -216,11 +276,11 @@ namespace Kaleidoscope.Parser
             }
 
             var body = this.ParseExpression();
-            return body == null ? null : new FunctionAst(proto, body);
+            return body == null ? null : new Expr.Function(proto, body);
         }
 
         /// toplevelexpr ::= expression
-        public FunctionAst ParseTopLevelExpr()
+        public Expr.Function ParseTopLevelExpr()
         {
             var e = this.ParseExpression();
             if (e == null)
@@ -229,12 +289,12 @@ namespace Kaleidoscope.Parser
             }
 
             // Make an anonymous proto.
-            var proto = new PrototypeAst("__anon_expr", new List<string>());
-            return new FunctionAst(proto, e);
+            var proto = new Expr.Prototype("__anon_expr", new string[0]);
+            return new Expr.Function(proto, e);
         }
 
         /// external ::= 'extern' prototype
-        public PrototypeAst ParseExtern()
+        public Expr.Prototype ParseExtern()
         {
             this._scanner.GetNextToken();  // eat extern.
             return this.ParsePrototype();

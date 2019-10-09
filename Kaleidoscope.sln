@@ -2,15 +2,21 @@
 Microsoft Visual Studio Solution File, Format Version 12.00
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Kaleidoscope", "Kaleidoscope\Kaleidoscope.csproj", "{1439EBE9-9EE3-43E7-B613-91825D50210E}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AstGen", "AstGen\AstGen.csproj", "{FA9D5BD5-AE5E-48E6-A6CF-B1D686C4B910}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
-		Debug|Any CPU = Debug|Any CPU
-		Release|Any CPU = Release|Any CPU
+		Release|x64 = Release|x64
+		Debug|x64 = Debug|x64
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{1439EBE9-9EE3-43E7-B613-91825D50210E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{1439EBE9-9EE3-43E7-B613-91825D50210E}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{1439EBE9-9EE3-43E7-B613-91825D50210E}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{1439EBE9-9EE3-43E7-B613-91825D50210E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{1439EBE9-9EE3-43E7-B613-91825D50210E}.Release|x64.ActiveCfg = Release|x64
+		{1439EBE9-9EE3-43E7-B613-91825D50210E}.Release|x64.Build.0 = Release|x64
+		{1439EBE9-9EE3-43E7-B613-91825D50210E}.Debug|x64.ActiveCfg = Debug|x64
+		{1439EBE9-9EE3-43E7-B613-91825D50210E}.Debug|x64.Build.0 = Debug|x64
+		{FA9D5BD5-AE5E-48E6-A6CF-B1D686C4B910}.Release|x64.ActiveCfg = Release|Any CPU
+		{FA9D5BD5-AE5E-48E6-A6CF-B1D686C4B910}.Release|x64.Build.0 = Release|Any CPU
+		{FA9D5BD5-AE5E-48E6-A6CF-B1D686C4B910}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{FA9D5BD5-AE5E-48E6-A6CF-B1D686C4B910}.Debug|x64.Build.0 = Debug|Any CPU
 	EndGlobalSection
 EndGlobal

@@ -14,11 +14,11 @@ namespace Kaleidoscope
     /// This engine uses the <see cref="Llvm.NET.JIT.OrcJit"/> engine to support lazy
     /// compilation of LLVM IR modules added to the JIT.
     /// </remarks>
-    public sealed class KaleidoscopeJIT
+    public sealed class KaleidoscopeJit
         : OrcJit
     {
-        /// <summary>Initializes a new instance of the <see cref="KaleidoscopeJIT"/> class.</summary>
-        public KaleidoscopeJIT( )
+        /// <summary>Initializes a new instance of the <see cref="KaleidoscopeJit"/> class.</summary>
+        public KaleidoscopeJit( )
             : base( BuildTargetMachine() )
         {
             this.AddInteropCallback( "putchard", new CallbackHandler1(this.PutChard ) );
@@ -27,7 +27,7 @@ namespace Kaleidoscope
 
         /// <summary>Gets or sets the output writer for output from the program.</summary>
         /// <remarks>The default writer is <see cref="Console.Out"/>.</remarks>
-        public TextWriter OutputWriter { get; set; } = Console.Out;
+        public TextWriter OutputWriter { get; } = Console.Out;
 
         /// <summary>Delegate for an interop callback taking no parameters</summary>
         /// <returns>value for the function</returns>

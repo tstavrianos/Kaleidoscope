@@ -1,14 +1,11 @@
-using Kaleidoscope.Ast;
-
 namespace Kaleidoscope.Parser
 {
     public interface IParser
     {
-        FunctionAst ParseDefinition();
+        void HandleDefinition();
 
-        PrototypeAst ParseExtern();
+        void HandleExtern();
 
-        FunctionAst ParseTopLevelExpr();
+        void HandleTopLevelExpression();
     }
-
 }
