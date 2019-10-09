@@ -89,6 +89,8 @@ namespace Kaleidoscope.Ast
         {
             public readonly string Name;
             public readonly string[] Arguments;
+            public readonly bool IsOperator;
+            public readonly int Precedence;
             public override T Accept<T>(IVisitor<T> visitor)
             {
                 return visitor.Visit(this);
@@ -97,10 +99,12 @@ namespace Kaleidoscope.Ast
             {
                 visitor.Visit(this);
             }
-            public Prototype(string name, string[] arguments)
+            public Prototype(string name, string[] arguments, bool isOperator, int precedence)
             {
                 this.Name = name;
                 this.Arguments = arguments;
+                this.IsOperator = isOperator;
+                this.Precedence = precedence;
             }
         }
         public sealed class Function : Expr 

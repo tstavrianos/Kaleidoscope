@@ -109,7 +109,7 @@ namespace AstGen
                 "Call     : string callee, Expr[] arguments",
                 "Number   : double value",
                 "Variable : string name",
-                "Prototype : string name, string[] arguments",
+                "Prototype : string name, string[] arguments, bool isOperator, int precedence",
                 "Function  : Prototype proto, Expr body",
                 "If        : Expr cond, Expr thenExpr, Expr elseExpr",
                 "For       : string varName, Expr start, Expr end, Expr step, Expr body"

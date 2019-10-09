@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Cryptography;
 using Kaleidoscope.Ast;
 using Llvm.NET;
 using Llvm.NET.Instructions;
@@ -88,29 +89,30 @@ namespace Kaleidoscope.Compiler
         {
             var l = expr.Lhs.Accept(this);
             var r = expr.Rhs.Accept(this);
+            if (l == null || r == null) return null;
 
-            Value n;
             switch (expr.Op)
             {
                 case '+':
-                    n = this._instructionBuilder.FAdd( l, r).RegisterName( "addtmp" );
-                    break;
+                    return this._instructionBuilder.FAdd( l, r).RegisterName( "addtmp" );
                 case '-':
-                    n = this._instructionBuilder.FSub( l, r).RegisterName( "subtmp" );
-                    break;
+                    return this._instructionBuilder.FSub( l, r).RegisterName( "subtmp" );
                 case '*':
-                    n = this._instructionBuilder.FMul( l, r).RegisterName( "multmp" );
-                    break;
+                    return this._instructionBuilder.FMul( l, r).RegisterName( "multmp" );
                 case '<':
                 {
                     var tmp = this._instructionBuilder.Compare( RealPredicate.UnorderedOrLessThan, l, r).RegisterName( "cmptmp" );
-                    n = this._instructionBuilder.UIToFPCast( tmp, this._instructionBuilder.Context.DoubleType ).RegisterName( "booltmp" );
-                    break;
+                    return this._instructionBuilder.UIToFPCast( tmp, this._instructionBuilder.Context.DoubleType ).RegisterName( "booltmp" );
                 }
-                default:
-                    throw new Exception("invalid binary operator");
             }
-            return n;
+
+            var f = this.GetFunction("binary" + expr.Op);
+            if (f == null)
+            {
+                throw new Exception("invalid binary operator");
+            }
+
+            return this._instructionBuilder.Call(f, l, r).RegisterName("binop");
         }
 
         public Value Visit(Expr.Call expr)

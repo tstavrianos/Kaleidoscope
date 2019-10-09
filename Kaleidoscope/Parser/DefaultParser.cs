@@ -235,16 +235,40 @@ namespace Kaleidoscope.Parser
         //   ::= id '(' id* ')'
         private Expr.Prototype ParsePrototype()
         {
-            if (this._scanner.CurrentToken != (int)Token.Identifier)
+            var kind = 0;
+            var precedence = 30;
+            var fnName = string.Empty;
+
+            switch (this._scanner.CurrentToken)
             {
-                Console.WriteLine("Expected function name in prototype");
-                return null;
+                case (int)Token.Identifier:
+                    kind = 0;
+                    fnName = this._scanner.LastIdentifier;
+                    this._scanner.GetNextToken();
+                    break;
+                case (int)Token.Binary:
+                    this._scanner.GetNextToken();
+                    fnName = "binary" + (char)this._scanner.CurrentToken;
+                    kind = 2;
+                    this._scanner.GetNextToken();
+
+                    if (this._scanner.CurrentToken == (int) Token.Number)
+                    {
+                        if (this._scanner.LastNumber < 1 || this._scanner.LastNumber > 100)
+                        {
+                            Console.WriteLine("Invalid precedence: must be 1..100");
+                            return null;
+                        }
+
+                        precedence = (int)this._scanner.LastNumber;
+                        this._scanner.GetNextToken();
+                    }
+                    break;
+                default:
+                    Console.WriteLine("Expected function name in prototype");
+                    return null;
             }
-
-            var fnName = this._scanner.LastIdentifier;
-
-            this._scanner.GetNextToken();
-
+            
             if (this._scanner.CurrentToken != '(')
             {
                 Console.WriteLine("Expected '(' in prototype");
@@ -265,7 +289,11 @@ namespace Kaleidoscope.Parser
 
             this._scanner.GetNextToken(); // eat ')'.
 
-            return new Expr.Prototype(fnName, argNames.ToArray());
+            if (kind == 0 || kind == argNames.Count)
+                return new Expr.Prototype(fnName, argNames.ToArray(), kind != 0, precedence);
+            Console.WriteLine("Invalid number of operands for operator");
+            return null;
+
         }
 
         // definition ::= 'def' prototype expression
@@ -293,7 +321,7 @@ namespace Kaleidoscope.Parser
             }
 
             // Make an anonymous proto.
-            var proto = new Expr.Prototype("__anon_expr", new string[0]);
+            var proto = new Expr.Prototype("__anon_expr", new string[0], false, 0);
             return new Expr.Function(proto, e);
         }
 

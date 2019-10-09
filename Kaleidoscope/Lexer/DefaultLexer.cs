@@ -83,6 +83,12 @@ namespace Kaleidoscope.Lexer
                     case "in":
                         this.CurrentToken = (int)Token.In;
                         break;
+                    case "binary":
+                        this.CurrentToken = (int)Token.Binary;
+                        break;
+                    case "unary":
+                        this.CurrentToken = (int)Token.Unary;
+                        break;
                     default:
                         this.CurrentToken = (int)Token.Identifier;
                         break;
