@@ -15,6 +15,56 @@ namespace Kaleidoscope.Ast
         {
             throw new NotImplementedException();
         }
+        public sealed class Number : Expr 
+        {
+            public readonly double Value;
+            public override T Accept<T>(IVisitor<T> visitor)
+            {
+                return visitor.Visit(this);
+            }
+            public override void Accept(IVisitor visitor)
+            {
+                visitor.Visit(this);
+            }
+            public Number(double value)
+            {
+                this.Value = value;
+            }
+        }
+        public sealed class Variable : Expr 
+        {
+            public readonly string Name;
+            public override T Accept<T>(IVisitor<T> visitor)
+            {
+                return visitor.Visit(this);
+            }
+            public override void Accept(IVisitor visitor)
+            {
+                visitor.Visit(this);
+            }
+            public Variable(string name)
+            {
+                this.Name = name;
+            }
+        }
+        public sealed class Unary : Expr 
+        {
+            public readonly char Opcode;
+            public readonly Expr Operand;
+            public override T Accept<T>(IVisitor<T> visitor)
+            {
+                return visitor.Visit(this);
+            }
+            public override void Accept(IVisitor visitor)
+            {
+                visitor.Visit(this);
+            }
+            public Unary(char opcode, Expr operand)
+            {
+                this.Opcode = opcode;
+                this.Operand = operand;
+            }
+        }
         public sealed class Binary : Expr 
         {
             public readonly char Op;
@@ -51,78 +101,6 @@ namespace Kaleidoscope.Ast
             {
                 this.Callee = callee;
                 this.Arguments = arguments;
-            }
-        }
-        public sealed class Number : Expr 
-        {
-            public readonly double Value;
-            public override T Accept<T>(IVisitor<T> visitor)
-            {
-                return visitor.Visit(this);
-            }
-            public override void Accept(IVisitor visitor)
-            {
-                visitor.Visit(this);
-            }
-            public Number(double value)
-            {
-                this.Value = value;
-            }
-        }
-        public sealed class Variable : Expr 
-        {
-            public readonly string Name;
-            public override T Accept<T>(IVisitor<T> visitor)
-            {
-                return visitor.Visit(this);
-            }
-            public override void Accept(IVisitor visitor)
-            {
-                visitor.Visit(this);
-            }
-            public Variable(string name)
-            {
-                this.Name = name;
-            }
-        }
-        public sealed class Prototype : Expr 
-        {
-            public readonly string Name;
-            public readonly string[] Arguments;
-            public readonly bool IsOperator;
-            public readonly int Precedence;
-            public override T Accept<T>(IVisitor<T> visitor)
-            {
-                return visitor.Visit(this);
-            }
-            public override void Accept(IVisitor visitor)
-            {
-                visitor.Visit(this);
-            }
-            public Prototype(string name, string[] arguments, bool isOperator, int precedence)
-            {
-                this.Name = name;
-                this.Arguments = arguments;
-                this.IsOperator = isOperator;
-                this.Precedence = precedence;
-            }
-        }
-        public sealed class Function : Expr 
-        {
-            public readonly Prototype Proto;
-            public readonly Expr Body;
-            public override T Accept<T>(IVisitor<T> visitor)
-            {
-                return visitor.Visit(this);
-            }
-            public override void Accept(IVisitor visitor)
-            {
-                visitor.Visit(this);
-            }
-            public Function(Prototype proto, Expr body)
-            {
-                this.Proto = proto;
-                this.Body = body;
             }
         }
         public sealed class If : Expr 
@@ -169,10 +147,10 @@ namespace Kaleidoscope.Ast
                 this.Body = body;
             }
         }
-        public sealed class Unary : Expr 
+        public sealed class _VarName : Expr 
         {
-            public readonly char Opcode;
-            public readonly Expr Operand;
+            public readonly string Name;
+            public readonly Expr Expression;
             public override T Accept<T>(IVisitor<T> visitor)
             {
                 return visitor.Visit(this);
@@ -181,35 +159,97 @@ namespace Kaleidoscope.Ast
             {
                 visitor.Visit(this);
             }
-            public Unary(char opcode, Expr operand)
+            public _VarName(string name, Expr expression)
             {
-                this.Opcode = opcode;
-                this.Operand = operand;
+                this.Name = name;
+                this.Expression = expression;
+            }
+        }
+        public sealed class Var : Expr 
+        {
+            public readonly _VarName[] VarNames;
+            public readonly Expr Body;
+            public override T Accept<T>(IVisitor<T> visitor)
+            {
+                return visitor.Visit(this);
+            }
+            public override void Accept(IVisitor visitor)
+            {
+                visitor.Visit(this);
+            }
+            public Var(_VarName[] varNames, Expr body)
+            {
+                this.VarNames = varNames;
+                this.Body = body;
+            }
+        }
+        public sealed class Prototype : Expr 
+        {
+            public readonly string Name;
+            public readonly string[] Arguments;
+            public readonly bool IsOperator;
+            public readonly int Precedence;
+            public override T Accept<T>(IVisitor<T> visitor)
+            {
+                return visitor.Visit(this);
+            }
+            public override void Accept(IVisitor visitor)
+            {
+                visitor.Visit(this);
+            }
+            public Prototype(string name, string[] arguments, bool isOperator, int precedence)
+            {
+                this.Name = name;
+                this.Arguments = arguments;
+                this.IsOperator = isOperator;
+                this.Precedence = precedence;
+            }
+        }
+        public sealed class Function : Expr 
+        {
+            public readonly Prototype Proto;
+            public readonly Expr Body;
+            public override T Accept<T>(IVisitor<T> visitor)
+            {
+                return visitor.Visit(this);
+            }
+            public override void Accept(IVisitor visitor)
+            {
+                visitor.Visit(this);
+            }
+            public Function(Prototype proto, Expr body)
+            {
+                this.Proto = proto;
+                this.Body = body;
             }
         }
         public interface IVisitor<out T>
         {
-            T Visit (Binary expr);
-            T Visit (Call expr);
             T Visit (Number expr);
             T Visit (Variable expr);
-            T Visit (Prototype expr);
-            T Visit (Function expr);
+            T Visit (Unary expr);
+            T Visit (Binary expr);
+            T Visit (Call expr);
             T Visit (If expr);
             T Visit (For expr);
-            T Visit (Unary expr);
+            T Visit (_VarName expr);
+            T Visit (Var expr);
+            T Visit (Prototype expr);
+            T Visit (Function expr);
         }
         public interface IVisitor
         {
-            void Visit (Binary expr);
-            void Visit (Call expr);
             void Visit (Number expr);
             void Visit (Variable expr);
-            void Visit (Prototype expr);
-            void Visit (Function expr);
+            void Visit (Unary expr);
+            void Visit (Binary expr);
+            void Visit (Call expr);
             void Visit (If expr);
             void Visit (For expr);
-            void Visit (Unary expr);
+            void Visit (_VarName expr);
+            void Visit (Var expr);
+            void Visit (Prototype expr);
+            void Visit (Function expr);
         }
     }
 }

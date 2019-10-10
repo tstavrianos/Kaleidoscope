@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using System.IO;
 using System.Text;
 
@@ -74,6 +73,9 @@ namespace Kaleidoscope.Lexer
                         break;
                     case "unary":
                         this.CurrentToken = (int)Token.Unary;
+                        break;
+                    case "var":
+                        this.CurrentToken = (int)Token.Var;
                         break;
                     default:
                         this.CurrentToken = (int)Token.Identifier;

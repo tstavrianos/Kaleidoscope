@@ -181,8 +181,10 @@ namespace Kaleidoscope.Parser
                     return this.ParseIf();
                 case (int)Token.For:
                     return this.ParseFor();
+                case (int)Token.Var:
+                    return this.ParseVar();
                 default:
-                    Console.WriteLine($"unknown token when expecting an expression");
+                    Console.WriteLine($"unknown token when expecting an expression {this._scanner.CurrentToken}, {(char)this._scanner.CurrentToken}");
                     return null;
             }
         }
@@ -444,6 +446,52 @@ namespace Kaleidoscope.Parser
             this._scanner.GetNextToken();
             var operand = this.ParseUnary();
             return operand != null ? new Expr.Unary((char)op, operand) : null;
+        }
+
+        private Expr.Var ParseVar()
+        {
+            this._scanner.GetNextToken();
+
+            var varNames = new List<Expr._VarName>();
+            if (this._scanner.CurrentToken != (int)Token.Identifier)
+            {
+                Console.WriteLine("expected identifier after var");
+                return null;
+            }
+
+            while (true)
+            {
+                var name = this._scanner.LastIdentifier;
+                this._scanner.GetNextToken();
+
+                Expr init = null;
+                if (this._scanner.CurrentToken == '=')
+                {
+                    this._scanner.GetNextToken();
+                    init = this.ParseExpression();
+                    if (init == null) return null;
+                }
+                
+                varNames.Add(new Expr._VarName(name, init));
+
+                if (this._scanner.CurrentToken != ',') break;
+                this._scanner.GetNextToken();
+
+                if (this._scanner.CurrentToken == (int) Token.Identifier) continue;
+                Console.WriteLine("expected identifier list after var");
+                return null;
+            }
+
+            if (this._scanner.CurrentToken != (int) Token.In)
+            {
+                Console.WriteLine("expected 'in' keyword after 'var'");
+                return null;
+            }
+
+            this._scanner.GetNextToken();
+
+            var body = this.ParseExpression();
+            return body == null ? null : new Expr.Var(varNames.ToArray(), body);
         }
     }
 }

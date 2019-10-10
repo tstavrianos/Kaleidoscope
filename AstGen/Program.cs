@@ -105,15 +105,17 @@ namespace AstGen
         private static void BuildExpressions()
         {
             var types = new [] {
-                "Binary   : char op, Expr lhs, Expr rhs",
-                "Call     : string callee, Expr[] arguments",
-                "Number   : double value",
-                "Variable : string name",
-                "Prototype : string name, string[] arguments, bool isOperator, int precedence",
-                "Function  : Prototype proto, Expr body",
+                "Number    : double value",
+                "Variable  : string name",
+                "Unary     : char opcode, Expr operand",
+                "Binary    : char op, Expr lhs, Expr rhs",
+                "Call      : string callee, Expr[] arguments",
                 "If        : Expr cond, Expr thenExpr, Expr elseExpr",
                 "For       : string varName, Expr start, Expr end, Expr step, Expr body",
-                "Unary     : char opcode, Expr operand"
+                "_VarName   : string name, Expr expression",
+                "Var       : _VarName[] varNames, Expr body",
+                "Prototype : string name, string[] arguments, bool isOperator, int precedence",
+                "Function  : Prototype proto, Expr body"
             };
 
             Build(types, "Expr");

@@ -10,6 +10,7 @@ namespace Kaleidoscope
         {
             this._binOpPrecedence = new Dictionary<char, int>
             {
+                ['='] = 2,
                 ['<'] = 10,
                 ['+'] = 20,
                 ['-'] = 20,

@@ -13,6 +13,7 @@ namespace Kaleidoscope.Lexer
         For = -9,
         In = -10,
         Binary = -11,
-        Unary = -12
+        Unary = -12,
+        Var = -13
     }
 }

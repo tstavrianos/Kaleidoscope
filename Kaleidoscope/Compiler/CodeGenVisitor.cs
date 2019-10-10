@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Security.Cryptography;
 using Kaleidoscope.Ast;
 using Llvm.NET;
 using Llvm.NET.Instructions;
@@ -14,18 +13,20 @@ namespace Kaleidoscope.Compiler
     {
         private readonly Context _ctx;
         private readonly InstructionBuilder _instructionBuilder;
-        private readonly ScopeStack<Value> _namedValues = new ScopeStack<Value>( );
+        private readonly ScopeStack<Alloca> _namedValues = new ScopeStack<Alloca>( );
         internal BitcodeModule Module;
         private FunctionPassManager _functionPassManager;
         private readonly bool _disableOptimizations;
         internal readonly KaleidoscopeJit Jit = new KaleidoscopeJit( );
         internal readonly IDictionary<string, Expr.Prototype> FunctionProtos = new Dictionary<string, Expr.Prototype>();
         private readonly Session _session;
+        private readonly TargetMachine _machine;
 
-        public CodeGenVisitor(bool disableOptimizations, Session session)
+        public CodeGenVisitor(bool disableOptimizations, Session session, TargetMachine machine)
         {
             this._disableOptimizations = disableOptimizations;
             this._ctx = new Context( );
+            this._machine = machine;
             this.InitializeModuleAndPassManager( );
             this._instructionBuilder = new InstructionBuilder( this._ctx );
             this._session = session;
@@ -64,8 +65,10 @@ namespace Kaleidoscope.Compiler
         internal void InitializeModuleAndPassManager( )
         {
             this.Module = this._ctx.CreateBitcodeModule( );
-            this.Module.Layout = this.Jit.TargetMachine.TargetData;
-            this._functionPassManager = new FunctionPassManager(this.Module );
+            this.Module.TargetTriple = this._machine.Triple;
+            this.Module.Layout = this._machine.TargetData;
+            this._functionPassManager = new FunctionPassManager( this.Module )
+                .AddPromoteMemoryToRegisterPass( );
 
             if( !this._disableOptimizations )
             {
@@ -89,6 +92,26 @@ namespace Kaleidoscope.Compiler
         
         public Value Visit(Expr.Binary expr)
         {
+            if (expr.Op == '=')
+            {
+                if (!(expr.Lhs is Expr.Variable lhse))
+                {
+                    Console.WriteLine("destination of '=' must be a variable");
+                    return null;
+                }
+                var val = expr.Rhs.Accept(this);
+                if (val == null) return null;
+
+                if(!this._namedValues.TryGetValue(lhse.Name, out var variable))
+                {
+                    Console.WriteLine("Unknown variable name");
+                    return null;
+                }
+
+                this._instructionBuilder.Store(val, variable);
+                return val;
+            }
+            
             var l = expr.Lhs.Accept(this);
             var r = expr.Rhs.Accept(this);
             if (l == null || r == null) return null;
@@ -137,10 +160,40 @@ namespace Kaleidoscope.Compiler
 
         public Value Visit(Expr.Variable expr)
         {
-            if (!this._namedValues.TryGetValue(expr.Name, out var value))
-                throw new Exception($"Unknown variable name {expr.Name}");
-            return value;
+            var value = this.LookupVariable(expr.Name);
+            return this._instructionBuilder.Load(value.ElementType, value).RegisterName(expr.Name);
+        }
 
+        public Value Visit(Expr.Var expr)
+        {
+            using (this._namedValues.EnterScope())
+            {
+                var function = this._instructionBuilder.InsertBlock.ContainingFunction;
+                foreach (var t in expr.VarNames)
+                {
+                    var varName = t.Name;
+                    var init = t.Expression;
+
+                    Value initVal;
+                    if (init != null)
+                    {
+                        initVal = init.Accept(this);
+                        if (initVal == null) return null;
+                    }
+                    else
+                    {
+                        initVal = this._ctx.CreateConstant(0.0);
+                    }
+
+                    var alloca = this._instructionBuilder.Alloca(function.Context.DoubleType).RegisterName(varName);
+                    this._instructionBuilder.Store(initVal, alloca);
+                    this._namedValues[varName] = alloca;
+                }
+
+                var body = expr.Body.Accept(this);
+
+                return body;
+            }
         }
 
         public Value Visit(Expr.Prototype stmt)
@@ -168,12 +221,11 @@ namespace Kaleidoscope.Compiler
                 this._instructionBuilder.PositionAtEnd(entryBlock);
                 using (this._namedValues.EnterScope())
                 {
-
-                    var index = 0;
-                    foreach (var param in stmt.Proto.Arguments)
+                    foreach (var arg in function.Parameters)
                     {
-                        this._namedValues[param] = function.Parameters[index];
-                        ++index;
+                        var alloca = this._instructionBuilder.Alloca(function.Context.DoubleType).RegisterName(arg.Name);
+                        this._instructionBuilder.Store(arg, alloca);
+                        this._namedValues[arg.Name] = alloca;
                     }
 
                     var funcReturn = stmt.Body.Accept(this);
@@ -237,21 +289,20 @@ namespace Kaleidoscope.Compiler
 
         public Value Visit(Expr.For expr)
         {
+            var function = this._instructionBuilder.InsertBlock.ContainingFunction;
+            var alloca = this._instructionBuilder.Alloca(function.Context.DoubleType).RegisterName(expr.VarName);
             var startVal = expr.Start.Accept(this);
             if (startVal == null) return null;
-
-            var function = this._instructionBuilder.InsertBlock.ContainingFunction;
-            var preHeaderBb = this._instructionBuilder.InsertBlock;
+            this._instructionBuilder.Store(startVal, alloca);
+            
             var loopBb = function.AppendBasicBlock("loop");
 
             this._instructionBuilder.Branch(loopBb);
             this._instructionBuilder.PositionAtEnd( loopBb );
 
-            var variable = this._instructionBuilder.PhiNode(function.Context.DoubleType).RegisterName(expr.VarName);
-            variable.AddIncoming( startVal, preHeaderBb );
             using (this._namedValues.EnterScope())
             {
-                this._namedValues[expr.VarName] = variable;
+                this._namedValues[expr.VarName] = alloca;
 
                 var body = expr.Body.Accept(this);
                 if (body == null) return null;
@@ -267,24 +318,25 @@ namespace Kaleidoscope.Compiler
                     stepVal = this._ctx.CreateConstant(1.0);
                 }
 
-                var nextVar = this._instructionBuilder.FAdd(variable, stepVal);
-
                 var endCond = expr.End.Accept(this);
                 if (endCond == null) return null;
+                var curVal = this._instructionBuilder.Load(function.Context.DoubleType, alloca);
+                var nextVar = this._instructionBuilder.FAdd(curVal, stepVal).RegisterName("nextvar");
+                this._instructionBuilder.Store(nextVar, alloca);
 
                 endCond = this._instructionBuilder
                     .Compare(RealPredicate.OrderedAndNotEqual, endCond, this._ctx.CreateConstant(0.0))
                     .RegisterName("loopcond");
 
-                var loopEndBb = this._instructionBuilder.InsertBlock;
                 var afterBb = function.AppendBasicBlock("afterloop");
                 this._instructionBuilder.Branch(endCond, loopBb, afterBb);
                 this._instructionBuilder.PositionAtEnd(afterBb);
-                variable.AddIncoming(nextVar, loopEndBb);
 
                 return this._ctx.DoubleType.GetNullValue();
             }
         }
+
+        public Value Visit(Expr._VarName expr) => null;
 
         public Value Visit(Expr.Unary expr)
         {
@@ -292,12 +344,23 @@ namespace Kaleidoscope.Compiler
             if (op == null) return null;
 
             var f = this.GetFunction($"unary{expr.Opcode}");
-            if (f == null)
-            {
-                Console.WriteLine("Unknown unary operator");
-                return null;
-            }
-            return this._instructionBuilder.Call(f, op).RegisterName("unop");
+            if (f != null) return this._instructionBuilder.Call(f, op).RegisterName("unop");
+            Console.WriteLine("Unknown unary operator");
+            return null;
         }
+        
+        private Alloca LookupVariable( string name )
+        {
+            if( !this._namedValues.TryGetValue( name, out var value ) )
+            {
+                // Source input is validated by the parser and AstBuilder, therefore
+                // this is the result of an internal error in the generator rather
+                // then some sort of user error.
+                throw new Exception( $"ICE: Unknown variable name: {name}" );
+            }
+
+            return value;
+        }
+
     }
 }
