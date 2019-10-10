@@ -1,10 +1,8 @@
-﻿using System;
-using System.IO;
+﻿using System.IO;
 using System.Runtime.CompilerServices;
 using Kaleidoscope.Compiler;
 using Kaleidoscope.Lexer;
 using Kaleidoscope.Parser;
-using Llvm.NET;
 using static Llvm.NET.Interop.Library;
 
 namespace Kaleidoscope
@@ -26,21 +24,23 @@ namespace Kaleidoscope
                 RegisterNative();
 
                 var session = new Session();
-                var machine = new TargetMachine( Triple.HostTriple);
-                var visitor = new CodeGenVisitor(false, session, machine);
-                var listener = new CodeGenParserListener(visitor);
+                //var machine = new TargetMachine( Triple.HostTriple);
+                //var visitor = new CodeGenVisitor(false, session, machine);
+                //var listener = new CodeGenParserListener(visitor);
+                var visitor = new IlGeneratorVisitor(session);
+                var listener = new IlGeneratorParserListener(visitor);
                 var lexer = new DefaultLexer(File.OpenText(args[0]));
                 var parser = new DefaultParser(lexer, listener, session);
                 
                 MainLoop(lexer, parser);
                 
-                machine.EmitToFile(visitor.Module, "output.o", CodeGenFileType.ObjectFile);
+                /*machine.EmitToFile(visitor.Module, "output.o", CodeGenFileType.ObjectFile);
                 if( !visitor.Module.WriteToTextFile( "output.ll", out string msg ) )
                 {
                     Console.Error.WriteLine( msg );
                     return;
                 }
-                machine.EmitToFile( visitor.Module, "output.s", CodeGenFileType.AssemblySource );
+                machine.EmitToFile( visitor.Module, "output.s", CodeGenFileType.AssemblySource );*/
             }
         }
 
