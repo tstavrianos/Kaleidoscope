@@ -42,6 +42,7 @@ namespace Kaleidoscope.Compiler
 
             var llvmSignature = this._ctx.GetFunctionType( this._ctx.DoubleType, prototype.Arguments.Select( _ => this._ctx.DoubleType ) );
             var retVal = this.Module.AddFunction( prototype.Name, llvmSignature );
+            retVal.Linkage = Linkage.External;
 
             int index = 0;
             foreach( var argId in prototype.Arguments )
@@ -80,7 +81,6 @@ namespace Kaleidoscope.Compiler
 
             this._functionPassManager.Initialize( );
         }
-
 
         public void Dispose()
         {

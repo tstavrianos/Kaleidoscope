@@ -4,6 +4,7 @@ using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
 using Kaleidoscope.Ast;
+using GrEmit;
 
 namespace Kaleidoscope.Compiler
 {
@@ -21,10 +22,10 @@ namespace Kaleidoscope.Compiler
 
         private sealed class VarSymbol : ISymbol
         {
-            public LocalBuilder Local;
+            public GroboIL.Local Local;
         }
         
-        private ILGenerator _emitter;
+        private GroboIL _emitter;
         private readonly ScopeStack<ISymbol> _symbols = new ScopeStack<ISymbol>();
         internal readonly Dictionary<string, (MethodInfo methodInfo, bool isExtern)> Methods = new Dictionary<string, (MethodInfo methodInfo, bool isExtern)>();
         private readonly Session _session;
@@ -43,7 +44,7 @@ namespace Kaleidoscope.Compiler
        
         public void Visit(Expr.Number expr)
         {
-            this._emitter.Emit(OpCodes.Ldc_R8, expr.Value);
+            this._emitter.Ldc_R8(expr.Value);
         }
 
         public void Visit(Expr.Variable expr)
@@ -53,10 +54,10 @@ namespace Kaleidoscope.Compiler
                 switch (symbol)
                 {
                     case ArgSymbol a:
-                        this._emitter.Emit(OpCodes.Ldarg, a.Index);
+                        this._emitter.Ldarg(a.Index);
                         break;
                     case VarSymbol v:
-                        this._emitter.Emit(OpCodes.Ldloc, v.Local);
+                        this._emitter.Ldloc(v.Local);
                         break;
                     default:
                         throw new NotImplementedException();
@@ -73,10 +74,10 @@ namespace Kaleidoscope.Compiler
             expr.Operand.Accept(this);
             if (!this.Methods.TryGetValue($"unary{expr.Opcode}", out var method))
                 throw new Exception($"Method unary{expr.Opcode} not found");
-            this._emitter.EmitCall(OpCodes.Call, method.methodInfo, null);
+            this._emitter.Call( method.methodInfo);
             if (method.methodInfo.ReturnType == typeof(void))
             {
-                this._emitter.Emit(OpCodes.Ldc_R8, 0.0);
+                this._emitter.Ldc_R8(0.0);
             }
         }
 
@@ -91,10 +92,10 @@ namespace Kaleidoscope.Compiler
                 switch (symbol)
                 {
                     case VarSymbol v:
-                        this._emitter.Emit(OpCodes.Stloc, v.Local);
+                        this._emitter.Stloc(v.Local);
                         break;
                     case ArgSymbol a:
-                        this._emitter.Emit(OpCodes.Starg, a.Index);
+                        this._emitter.Starg(a.Index);
                         break;
                     default:
                         throw new NotImplementedException();
@@ -110,23 +111,23 @@ namespace Kaleidoscope.Compiler
             switch (expr.Op)
             {
                 case '+':
-                    this._emitter.Emit(OpCodes.Add);
+                    this._emitter.Add();
                     break;
                 case '-':
-                    this._emitter.Emit(OpCodes.Sub);
+                    this._emitter.Sub();
                     break;
                 case '*':
-                    this._emitter.Emit(OpCodes.Mul);
+                    this._emitter.Mul();
                     break;
                 case '<':
-                    var endLabel = this._emitter.DefineLabel();
-                    var trueLabel = this._emitter.DefineLabel();
+                    var endLabel = this._emitter.DefineLabel("endLabel");
+                    var trueLabel = this._emitter.DefineLabel("trueLabel");
 
-                    this._emitter.Emit(OpCodes.Blt, trueLabel);
-                    this._emitter.Emit(OpCodes.Ldc_R8, 0.0);
-                    this._emitter.Emit(OpCodes.Br, endLabel);
+                    this._emitter.Blt(trueLabel, false);
+                    this._emitter.Ldc_R8( 0.0);
+                    this._emitter.Br( endLabel);
                     this._emitter.MarkLabel(trueLabel);
-                    this._emitter.Emit(OpCodes.Ldc_R8, 1.0);
+                    this._emitter.Ldc_R8( 1.0);
                     this._emitter.MarkLabel(endLabel);
                     break;
                 default:
@@ -137,10 +138,10 @@ namespace Kaleidoscope.Compiler
             if (builtin) return;
             if (!this.Methods.TryGetValue($"binary{expr.Op}", out var method)) throw new Exception($"Method binary{expr.Op} not found");
 
-            this._emitter.EmitCall(OpCodes.Call, method.methodInfo, null);
+            this._emitter.Call( method.methodInfo);
             if (method.methodInfo.ReturnType == typeof(void))
             {
-                this._emitter.Emit(OpCodes.Ldc_R8, 0.0);
+                this._emitter.Ldc_R8( 0.0);
             }
         }
 
@@ -153,25 +154,25 @@ namespace Kaleidoscope.Compiler
 
             if (!this.Methods.TryGetValue(expr.Callee, out var method))
                 throw new Exception($"Method {expr.Callee} not found");
-            this._emitter.Emit(OpCodes.Call, method.methodInfo);
+            this._emitter.Call( method.methodInfo);
 
             if (method.methodInfo.ReturnType == typeof(void))
             {
-                this._emitter.Emit(OpCodes.Ldc_R8, 0.0);
+                this._emitter.Ldc_R8( 0.0);
             }
         }
 
         public void Visit(Expr.If expr)
         {
-            var endLabel = this._emitter.DefineLabel();
-            var elseLabel = this._emitter.DefineLabel();
+            var endLabel = this._emitter.DefineLabel("endLabel");
+            var elseLabel = this._emitter.DefineLabel("elseLabel");
 
             expr.Cond.Accept(this);
-            this._emitter.Emit(OpCodes.Ldc_R8, 0.0);
-            this._emitter.Emit(OpCodes.Beq, elseLabel);
+            this._emitter.Ldc_R8( 0.0);
+            this._emitter.Beq( elseLabel);
 
             expr.ThenExpr.Accept(this);
-            this._emitter.Emit(OpCodes.Br, endLabel);
+            this._emitter.Br( endLabel);
 
             this._emitter.MarkLabel(elseLabel);
             expr.ElseExpr.Accept(this);
@@ -182,36 +183,36 @@ namespace Kaleidoscope.Compiler
         {
             var  loopVar = this._emitter.DeclareLocal(typeof(double));
             expr.Start.Accept(this);
-            this._emitter.Emit(OpCodes.Stloc, loopVar);
+            this._emitter.Stloc( loopVar);
 			
             //Add the loop variable
             using (this._symbols.EnterScope())
             {
                 this._symbols[expr.VarName] = new VarSymbol {Local = loopVar};
 
-                var loopStart = this._emitter.DefineLabel();
-                var end = this._emitter.DefineLabel();
+                var loopStart = this._emitter.DefineLabel("loopStart");
+                var end = this._emitter.DefineLabel("end");
 
                 //Emit the loop condition
                 this._emitter.MarkLabel(loopStart);
                 expr.End.Accept(this);
-                this._emitter.Emit(OpCodes.Ldc_R8, 0.0);
-                this._emitter.Emit(OpCodes.Beq, end);
+                this._emitter.Ldc_R8( 0.0);
+                this._emitter.Beq( end);
 
                 //The body
                 expr.Body.Accept(this);
 
                 //Pop any value returned from the body
-                this._emitter.Emit(OpCodes.Pop);
+                this._emitter.Pop();
 
                 //The step
-                this._emitter.Emit(OpCodes.Ldloc, loopVar);
+                this._emitter.Ldloc( loopVar);
                 expr.Step.Accept(this);
-                this._emitter.Emit(OpCodes.Add);
-                this._emitter.Emit(OpCodes.Stloc, loopVar);
-                this._emitter.Emit(OpCodes.Br, loopStart);
+                this._emitter.Add();
+                this._emitter.Stloc( loopVar);
+                this._emitter.Br( loopStart);
                 this._emitter.MarkLabel(end);
-                this._emitter.Emit(OpCodes.Ldc_R8, 0.0);
+                this._emitter.Ldc_R8( 0.0);
             }
         }
 
@@ -233,9 +234,9 @@ namespace Kaleidoscope.Compiler
                     }
                     else
                     {
-                        this._emitter.Emit(OpCodes.Ldc_R8, 0.0);
+                        this._emitter.Ldc_R8(0.0);
                     }
-                    this._emitter.Emit(OpCodes.Stloc, local);
+                    this._emitter.Stloc(local);
                 }
 
                 expr.Body.Accept(this);
@@ -272,24 +273,26 @@ namespace Kaleidoscope.Compiler
             var args = expr.Proto.Arguments.Select(x => typeof(double)).ToArray();
             
             var function = new DynamicMethod(expr.Proto.Name, typeof(double), args);
-            var generator = function.GetILGenerator();
-            using (this._symbols.EnterScope())
+            using (var generator = new GroboIL(function))
             {
-                for (ushort i = 0; i < expr.Proto.Arguments.Length; i++)
+                using (this._symbols.EnterScope())
                 {
-                    this._symbols[expr.Proto.Arguments[i]] = new ArgSymbol{Index = i};
-                }
+                    for (ushort i = 0; i < expr.Proto.Arguments.Length; i++)
+                    {
+                        this._symbols[expr.Proto.Arguments[i]] = new ArgSymbol {Index = i};
+                    }
 
-                this.Methods[expr.Proto.Name] = (function, false);
-                var prevEmit = this._emitter;
-                this._emitter = generator;
-                expr.Body.Accept(this);
-                generator.Emit(OpCodes.Ret);
-                this._emitter = prevEmit;
-                
-                if (expr.Proto.IsOperator && expr.Proto.Arguments.Length == 2)
-                {
-                    this._session.AddBinOpPrecedence(expr.Proto.Name[^1], expr.Proto.Precedence);
+                    this.Methods[expr.Proto.Name] = (function, false);
+                    var prevEmit = this._emitter;
+                    this._emitter = generator;
+                    expr.Body.Accept(this);
+                    generator.Ret();
+                    this._emitter = prevEmit;
+
+                    if (expr.Proto.IsOperator && expr.Proto.Arguments.Length == 2)
+                    {
+                        this._session.AddBinOpPrecedence(expr.Proto.Name[^1], expr.Proto.Precedence);
+                    }
                 }
             }
         }
