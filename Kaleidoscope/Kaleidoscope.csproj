@@ -18,7 +18,7 @@
 
     <ItemGroup>
       <PackageReference Include="GrEmit" Version="3.2.2" />
-      <PackageReference Include="Llvm.NET" Version="8.0.0-alpha.0.0.ci-BLD.467733899" />
+      <PackageReference Include="Llvm.NET" Version="8.0.0-delta" />
       <PackageReference Include="Llvm.NET.Interop" Version="8.0.0-alpha.0.0.ci-BLD.467733899" />
     </ItemGroup>
 </Project>
