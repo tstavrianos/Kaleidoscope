@@ -17,7 +17,7 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <PackageReference Include="GrEmit" Version="3.4.1" />
+      <PackageReference Include="GrEmit" Version="3.4.10" />
       <PackageReference Include="Llvm.NET" Version="8.0.1" />
       <PackageReference Include="Llvm.NET.Interop" Version="8.0.1" />
     </ItemGroup>
